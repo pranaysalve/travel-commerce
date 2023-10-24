@@ -18,8 +18,8 @@ exports.getCartItems = catchAsync(async (req, res, next) => {
 exports.addRemoveCoupon = catchAsync(async (req, res, next) => {
   try {
     const { coupon, type } = req.body;
+    console.log({ coupon });
     const CouponData = await Coupon.findOne({ name: coupon });
-
     const isCouponAdded = await Cart.findOne({ coupon: CouponData._id });
 
     if (isCouponAdded) {
@@ -31,25 +31,33 @@ exports.addRemoveCoupon = catchAsync(async (req, res, next) => {
     const AvailableCart = await Cart.findOne({ user: req.user.id });
     if (CouponData && AvailableCart) {
       if (type === 'add') {
-        AvailableCart.coupon = CouponData.id;
-        AvailableCart.totalAfterDiscount -=
-          AvailableCart.totalAfterDiscount * (CouponData.discount`` / 100);
-        const updatedCart = await AvailableCart.save();
+        try {
+          AvailableCart.coupon = CouponData.id;
 
-        res.status(200).json({
-          status: 'success',
-          results: updatedCart.length, // You are updating a single document
-          data: {
-            data: updatedCart,
-          },
-        });
+          AvailableCart.totalAfterDiscount -=
+            AvailableCart.totalAfterDiscount * (CouponData.discount / 100);
+          const updatedCart = await AvailableCart.save();
+
+          res.status(200).json({
+            status: 'success',
+            results: updatedCart.length,
+            data: {
+              data: updatedCart,
+            },
+          });
+        } catch (error) {
+          console.error('Error:', error);
+          res
+            .status(500)
+            .json({ status: 'error', message: 'An error occurred.' });
+        }
       }
       if (type === 'remove') {
         AvailableCart.totalAfterDiscount = AvailableCart.cartTotal;
         const updatedCart = await AvailableCart.save();
         res.status(200).json({
           status: 'success',
-          results: updatedCart.length, // You are updating a single document
+          results: updatedCart.length,
           data: {
             data: updatedCart,
             coupon: CouponData,
@@ -68,61 +76,47 @@ exports.removeItemFromCart = catchAsync(async (req, res, next) => {
     const AvailableCart = await Cart.findOne({ user: req.user.id });
     const isCouponAdded = AvailableCart.coupon;
     if (isCouponAdded) {
-      const CouponData = await Coupon.findOne({
-        coupon: AvailableCart.coupon._id,
-      });
-      const Filter = {
-        user: req.user.id,
-        'tours.tour': _id,
-        'tours.price': price,
-      };
-      const RemoveCart = {
-        $pull: {
-          tours: {
-            tour: _id,
-            price: price,
+      try {
+        const UpdateCart = await Cart.findOneAndUpdate(
+          {
+            user: req.user.id,
+            'tours.tour': _id,
+            'tours.price': price,
           },
-        },
-      };
-      const newCart = await Cart.findOneAndUpdate(Filter, RemoveCart, {
-        new: true,
-      });
-
-      let cartTotal = 0;
-      cartTotal = await newCart.tours
-        .map((tour) => tour.price)
-        .reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-      console.log({ cartTotal });
-
-      let totalAfterDiscount = 0;
-      totalAfterDiscount =
-        Number(cartTotal) -
-        Number(cartTotal) * Number(AvailableCart.coupon.discount / 100);
-      console.log({ totalAfterDiscount });
-
-      const NewData = {
-        cartTotal: cartTotal,
-        totalAfterDiscount: totalAfterDiscount,
-      };
-
-      console.log({ NewData });
-
-      const updatedCart = await Cart.findOneAndUpdate(
-        { user: req.user.id },
-        NewData,
-        {
-          new: true,
-        },
-      );
-      console.log({ updatedCart });
-
-      res.status(200).json({
-        status: 'success',
-        results: updatedCart.length, // You are updating a single document
-        data: {
-          data: updatedCart,
-        },
-      });
+          {
+            $pull: {
+              tours: {
+                tour: _id,
+                price: price,
+              },
+            },
+          },
+          { new: true },
+        );
+        let cartTotal = 0;
+        let totalAfterDiscount = 0;
+        cartTotal = UpdateCart.tours
+          .map((tour) => tour.price)
+          .reduce((accu, currVal) => accu + currVal, 0);
+        totalAfterDiscount =
+          cartTotal - cartTotal * (UpdateCart.coupon.discount / 100);
+        UpdateCart.cartTotal = cartTotal;
+        UpdateCart.totalAfterDiscount = totalAfterDiscount;
+        const doc = await UpdateCart.save();
+        console.log({ cartTotal, totalAfterDiscount, doc });
+        return res.status(200).json({
+          status: 'success',
+          results: doc.length,
+          data: {
+            data: doc,
+          },
+        });
+      } catch (error) {
+        console.error('Error:', error);
+        return res
+          .status(500)
+          .json({ status: 'error', message: 'An error occurred.' });
+      }
     }
 
     const RemoveCart = {
@@ -137,7 +131,7 @@ exports.removeItemFromCart = catchAsync(async (req, res, next) => {
     const updatedCart = await AvailableCart.save();
     res.status(200).json({
       status: 'success',
-      results: updatedCart.length, // You are updating a single document
+      results: updatedCart.length,
       data: {
         data: updatedCart,
       },
@@ -174,7 +168,7 @@ exports.addItemToCart = catchAsync(async (req, res, next) => {
       };
 
       AvailableCart.tours.push(AddCart);
-
+      AvailableCart.coupon = null;
       AvailableCart.cartTotal += price;
       AvailableCart.totalAfterDiscount += price;
 
@@ -182,7 +176,7 @@ exports.addItemToCart = catchAsync(async (req, res, next) => {
 
       res.status(200).json({
         status: 'success',
-        results: updatedCart.length, // You are updating a single document
+        results: updatedCart.length,
         data: {
           data: updatedCart,
         },
