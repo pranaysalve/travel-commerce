@@ -33,7 +33,7 @@ exports.addRemoveCoupon = catchAsync(async (req, res, next) => {
       if (type === 'add') {
         AvailableCart.coupon = CouponData.id;
         AvailableCart.totalAfterDiscount -=
-          AvailableCart.totalAfterDiscount * (CouponData.discount / 100);
+          AvailableCart.totalAfterDiscount * (CouponData.discount`` / 100);
         const updatedCart = await AvailableCart.save();
 
         res.status(200).json({
@@ -64,8 +64,67 @@ exports.addRemoveCoupon = catchAsync(async (req, res, next) => {
 
 exports.removeItemFromCart = catchAsync(async (req, res, next) => {
   try {
-    const { _id, price } = req.body.data;
+    const { _id, price } = req.body.tour;
     const AvailableCart = await Cart.findOne({ user: req.user.id });
+    const isCouponAdded = AvailableCart.coupon;
+    if (isCouponAdded) {
+      const CouponData = await Coupon.findOne({
+        coupon: AvailableCart.coupon._id,
+      });
+      const Filter = {
+        user: req.user.id,
+        'tours.tour': _id,
+        'tours.price': price,
+      };
+      const RemoveCart = {
+        $pull: {
+          tours: {
+            tour: _id,
+            price: price,
+          },
+        },
+      };
+      const newCart = await Cart.findOneAndUpdate(Filter, RemoveCart, {
+        new: true,
+      });
+
+      let cartTotal = 0;
+      cartTotal = await newCart.tours
+        .map((tour) => tour.price)
+        .reduce((accumulator, currentValue) => accumulator + currentValue, 0);
+      console.log({ cartTotal });
+
+      let totalAfterDiscount = 0;
+      totalAfterDiscount =
+        Number(cartTotal) -
+        Number(cartTotal) * Number(AvailableCart.coupon.discount / 100);
+      console.log({ totalAfterDiscount });
+
+      const NewData = {
+        cartTotal: cartTotal,
+        totalAfterDiscount: totalAfterDiscount,
+      };
+
+      console.log({ NewData });
+
+      const updatedCart = await Cart.findOneAndUpdate(
+        { user: req.user.id },
+        NewData,
+        {
+          new: true,
+        },
+      );
+      console.log({ updatedCart });
+
+      res.status(200).json({
+        status: 'success',
+        results: updatedCart.length, // You are updating a single document
+        data: {
+          data: updatedCart,
+        },
+      });
+    }
+
     const RemoveCart = {
       tour: _id,
       price: price,

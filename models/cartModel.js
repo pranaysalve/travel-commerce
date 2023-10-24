@@ -36,5 +36,13 @@ CartSchema.pre(/^find/, function (next) {
 
   next();
 });
+CartSchema.pre(/^find/, function (next) {
+  this.populate({
+    path: 'coupon',
+    select: '',
+  });
+
+  next();
+});
 
 module.exports = mongoose.model('Cart', CartSchema);
