@@ -20,6 +20,7 @@ const bookingRouter = require('./routes/bookingRoutes');
 const bookingController = require('./controllers/bookingController');
 const cartRouter = require('./routes/cartRoutes');
 const couponRouter = require('./routes/couponRoute');
+const checkoutRouter = require('./routes/checkoutRoutes');
 // const viewRouter = require('./routes/viewRoutes');
 
 //dot env config
@@ -120,6 +121,7 @@ app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/bookings', bookingRouter);
 app.use('/api/v1/cart', cartRouter);
 app.use('/api/v1/coupon', couponRouter);
+app.use('/api/v1/checkout', checkoutRouter);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
